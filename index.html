@@ -617,56 +617,70 @@ function renderPeriodButtons() {
 // ===================== KPI CARDS =====================
 function renderKPIs() {
   const grid = document.getElementById('kpi-grid');
+  if (!grid) return;
   grid.innerHTML = '';
 
-  let totalGen = 0, totalRec = 0, totalSaldo = 0, totalSaldoGer = 0;
+  let totalGen = 0, totalRec = 0, totalSaldo = 0, totalSaldoGer = 0, totalGenAcum = 0;
   const ucsSeenKPI = new Set();
-  DATA.usinas.forEach(u => {
-    if (u === 'GLOBO EIRELI') return;
-    const d = DATA.dashboard_data[u];
-    const idx = d.periodos.indexOf(selectedPeriodo);
-    if (idx >= 0) {
-      totalGen += d.geracao[idx];
-      if (d.saldo_geradora) totalSaldoGer += d.saldo_geradora[idx];
-    }
-    const ri = d.rec_periodos.indexOf(selectedPeriodo);
-    if (ri >= 0) totalRec += d.recebimento[ri];
-    const hp = d.recebedoras_historico && d.recebedoras_historico[selectedPeriodo] ? d.recebedoras_historico[selectedPeriodo] : [];
-    hp.forEach(r => {
-      if (r.Modalidade && r.Modalidade.toLowerCase().includes('geradora')) return;
-      if (!ucsSeenKPI.has(r.UC_short)) {
-        ucsSeenKPI.add(r.UC_short);
-        totalSaldo += (r.SaldoAtual || 0);
-      }
-    });
-  // Calcular Geração Acumulada (Soma de todos os períodos até o período selecionado)
-  let totalGenAcum = 0;
-  const periodIdx = DATA.periodos_all.indexOf(selectedPeriodo);
-  const periodosAte = periodIdx >= 0 ? DATA.periodos_all.slice(0, periodIdx + 1) : DATA.periodos_all;
 
-  DATA.usinas.forEach(u => {
-    if (u === 'GLOBO EIRELI') return;
-    const d = DATA.dashboard_data[u];
-    periodosAte.forEach(p => {
-      const idx = d.periodos.indexOf(p);
-      if (idx >= 0) {
-        totalGenAcum += d.geracao[idx];
+  const periodIdx = (DATA.periodos_all && selectedPeriodo) ? DATA.periodos_all.indexOf(selectedPeriodo) : -1;
+  const periodosAte = (DATA.periodos_all && periodIdx >= 0) ? DATA.periodos_all.slice(0, periodIdx + 1) : (DATA.periodos_all || []);
+
+  if (DATA.usinas && DATA.dashboard_data) {
+    DATA.usinas.forEach(u => {
+      if (u === 'GLOBO EIRELI') return;
+      const d = DATA.dashboard_data[u];
+      if (!d) return;
+
+      if (d.periodos && d.geracao) {
+        const idx = d.periodos.indexOf(selectedPeriodo);
+        if (idx >= 0 && typeof d.geracao[idx] === 'number') {
+          totalGen += d.geracao[idx];
+        }
+        if (idx >= 0 && d.saldo_geradora && typeof d.saldo_geradora[idx] === 'number') {
+          totalSaldoGer += d.saldo_geradora[idx];
+        }
+
+        periodosAte.forEach(p => {
+          const pIdx = d.periodos.indexOf(p);
+          if (pIdx >= 0 && typeof d.geracao[pIdx] === 'number') {
+            totalGenAcum += d.geracao[pIdx];
+          }
+        });
+      }
+
+      if (d.rec_periodos && d.recebimento) {
+        const ri = d.rec_periodos.indexOf(selectedPeriodo);
+        if (ri >= 0 && typeof d.recebimento[ri] === 'number') {
+          totalRec += d.recebimento[ri];
+        }
+      }
+
+      if (d.recebedoras_historico && d.recebedoras_historico[selectedPeriodo]) {
+        const hp = d.recebedoras_historico[selectedPeriodo];
+        hp.forEach(r => {
+          if (r.Modalidade && r.Modalidade.toLowerCase().includes('geradora')) return;
+          if (!ucsSeenKPI.has(r.UC_short)) {
+            ucsSeenKPI.add(r.UC_short);
+            totalSaldo += (r.SaldoAtual || 0);
+          }
+        });
       }
     });
-  });
+  }
 
   const efic = pct(totalRec, totalGen);
   const perdas = totalGen - totalRec;
 
   const cards = [
-    { label: 'Geração Total Mês', value: fmt(totalGen) + ' kWh', sub: 'Todas as usinas · ' + selectedPeriodo, cls: '' },
-    { label: 'Geração Acumulada', value: fmt(totalGenAcum) + ' kWh', sub: 'Acumulado até ' + selectedPeriodo, cls: 'green', vcls: 'green' },
+    { label: 'Geração Total Mês', value: fmt(totalGen) + ' kWh', sub: 'Todas as usinas · ' + (selectedPeriodo || ''), cls: '' },
+    { label: 'Geração Acumulada', value: fmt(totalGenAcum) + ' kWh', sub: 'Acumulado até ' + (selectedPeriodo || ''), cls: 'green', vcls: 'green' },
     { label: 'Recebimento Total', value: fmt(totalRec) + ' kWh', sub: 'Soma instalações recebedoras', cls: '', vcls: '' },
     { label: 'Eficiência Rateio', value: efic + '%', sub: 'Recebido ÷ Gerado', cls: efic >= 90 ? '' : 'yellow', vcls: efic >= 90 ? 'green' : efic >= 70 ? 'yellow' : 'red' },
     { label: 'Saldo Geradora(s)', value: fmt(totalSaldoGer) + ' kWh', sub: 'Ver detalhamento por usina', cls: 'yellow clickable-card', vcls: '', action: 'showModalGeradoras()' },
     { label: 'Perdas / Diferença', value: fmt(perdas) + ' kWh', sub: 'Geração não distribuída', cls: perdas > 1000 ? 'red' : 'yellow', vcls: perdas > 1000 ? 'red' : 'yellow' },
     { label: 'Saldo Acumulado', value: fmt(totalSaldo) + ' kWh', sub: 'Ver top recebedoras', cls: 'purple clickable-card', vcls: '', action: 'showModalRecebedoras()' },
-    { label: 'Usinas Ativas', value: DATA.usinas.length, sub: 'Geração compartilhada', cls: '' }
+    { label: 'Usinas Ativas', value: DATA.usinas ? DATA.usinas.length : 0, sub: 'Geração compartilhada', cls: '' }
   ];
 
   cards.forEach(c => {
@@ -973,13 +987,13 @@ function showModalRecebedoras() {
 
 // ===================== RENDER ALL =====================
 function renderAll() {
-  renderPeriodButtons();
-  renderKPIs();
-  renderDonuts();
-  renderChartGerRec();
-  renderChartRateio();
-  renderUsinaTabs();
-  renderTable();
+  try { renderPeriodButtons(); } catch(e) { console.error('Error in renderPeriodButtons:', e); }
+  try { renderKPIs(); } catch(e) { console.error('Error in renderKPIs:', e); }
+  try { renderDonuts(); } catch(e) { console.error('Error in renderDonuts:', e); }
+  try { renderChartGerRec(); } catch(e) { console.error('Error in renderChartGerRec:', e); }
+  try { renderChartRateio(); } catch(e) { console.error('Error in renderChartRateio:', e); }
+  try { renderUsinaTabs(); } catch(e) { console.error('Error in renderUsinaTabs:', e); }
+  try { renderTable(); } catch(e) { console.error('Error in renderTable:', e); }
 }
 
 // INIT
