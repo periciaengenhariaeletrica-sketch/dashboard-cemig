@@ -636,14 +636,29 @@ function renderKPIs() {
         totalSaldo += (r.SaldoAtual || 0);
       }
     });
+  // Calcular Geração Acumulada (Soma de todos os períodos até o período selecionado)
+  let totalGenAcum = 0;
+  const periodIdx = DATA.periodos_all.indexOf(selectedPeriodo);
+  const periodosAte = periodIdx >= 0 ? DATA.periodos_all.slice(0, periodIdx + 1) : DATA.periodos_all;
+
+  DATA.usinas.forEach(u => {
+    if (u === 'GLOBO EIRELI') return;
+    const d = DATA.dashboard_data[u];
+    periodosAte.forEach(p => {
+      const idx = d.periodos.indexOf(p);
+      if (idx >= 0) {
+        totalGenAcum += d.geracao[idx];
+      }
+    });
   });
 
   const efic = pct(totalRec, totalGen);
   const perdas = totalGen - totalRec;
 
   const cards = [
-    { label: 'Geração Total', value: fmt(totalGen) + ' kWh', sub: 'Todas as usinas · ' + selectedPeriodo, cls: '' },
-    { label: 'Recebimento Total', value: fmt(totalRec) + ' kWh', sub: 'Soma instalações recebedoras', cls: 'green', vcls: 'green' },
+    { label: 'Geração Total Mês', value: fmt(totalGen) + ' kWh', sub: 'Todas as usinas · ' + selectedPeriodo, cls: '' },
+    { label: 'Geração Acumulada', value: fmt(totalGenAcum) + ' kWh', sub: 'Acumulado até ' + selectedPeriodo, cls: 'green', vcls: 'green' },
+    { label: 'Recebimento Total', value: fmt(totalRec) + ' kWh', sub: 'Soma instalações recebedoras', cls: '', vcls: '' },
     { label: 'Eficiência Rateio', value: efic + '%', sub: 'Recebido ÷ Gerado', cls: efic >= 90 ? '' : 'yellow', vcls: efic >= 90 ? 'green' : efic >= 70 ? 'yellow' : 'red' },
     { label: 'Saldo Geradora(s)', value: fmt(totalSaldoGer) + ' kWh', sub: 'Ver detalhamento por usina', cls: 'yellow clickable-card', vcls: '', action: 'showModalGeradoras()' },
     { label: 'Perdas / Diferença', value: fmt(perdas) + ' kWh', sub: 'Geração não distribuída', cls: perdas > 1000 ? 'red' : 'yellow', vcls: perdas > 1000 ? 'red' : 'yellow' },
