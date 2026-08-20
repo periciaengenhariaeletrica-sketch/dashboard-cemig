@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cemig-dash-v1787193040';
+const CACHE_NAME = 'cemig-dash-v1787221199';
 const ASSETS = [
   './',
   './index.html',
