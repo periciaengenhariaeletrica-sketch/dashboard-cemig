@@ -1024,7 +1024,8 @@ async function forceAppRefresh() {
         window.location.reload(true);
       }, 1500);
     } else {
-      alert('Aviso: ' + (data.message || 'Erro ao conectar no servidor local. Certifique-se de que python api.py está rodando.'));
+      const msg = data.message || data.detail || 'Erro no servidor ao buscar faturas no portal CEMIG.';
+      alert('Aviso: ' + msg);
       if (btn) {
         btn.disabled = false;
         btn.style.opacity = '1';
