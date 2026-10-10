@@ -117,6 +117,8 @@
     color: #0a0f1a;
     box-shadow: 0 0 12px rgba(0, 212, 170, 0.4);
   }
+  @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+  .refresh-icon.spinning { animation: spin 1s linear infinite; }
 
   /* PERIOD SELECTOR */
   .period-bar {
@@ -999,28 +1001,46 @@ function renderAll() {
 // INIT
 renderAll();
 
-function forceAppRefresh() {
+async function forceAppRefresh() {
   const btn = document.querySelector('.btn-refresh');
+  const oldHtml = btn ? btn.innerHTML : '';
   if (btn) {
-    btn.style.opacity = '0.5';
-    btn.innerHTML = `<span>Atualizando...</span>`;
+    btn.disabled = true;
+    btn.style.opacity = '0.8';
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="refresh-icon spinning"><path d="M21.5 2v6h-6M2.13 15.57a10 10 0 1 0 3.93-9.57L2.5 8"/></svg><span>Buscando CEMIG...</span>`;
   }
   
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      for (let registration of registrations) {
-        registration.unregister();
-      }
-      caches.keys().then(keys => {
-        return Promise.all(keys.map(key => caches.delete(key)));
-      }).then(() => {
-        window.location.reload(true);
-      });
-    }).catch(() => {
-      window.location.reload(true);
+  const apiHost = (window.location.protocol === 'file:' || window.location.origin.includes('github.io')) ? 'http://localhost:8000' : '';
+  
+  try {
+    const res = await fetch(apiHost + '/api/atualizar_consorcios', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' }
     });
-  } else {
-    window.location.reload(true);
+    const data = await res.json();
+    if (res.ok) {
+      if (btn) btn.innerHTML = `<span>✓ CEMIG Atualizada!</span>`;
+      setTimeout(() => {
+        window.location.reload(true);
+      }, 1500);
+    } else {
+      alert('Aviso: ' + (data.message || 'Erro ao conectar no servidor local. Certifique-se de que python api.py está rodando.'));
+      if (btn) {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+        btn.innerHTML = oldHtml;
+      }
+    }
+  } catch (err) {
+    console.warn('Servidor local indisponível, realizando atualização local do app...', err);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        for (let registration of registrations) registration.unregister();
+        caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k)))).then(() => window.location.reload(true));
+      }).catch(() => window.location.reload(true));
+    } else {
+      window.location.reload(true);
+    }
   }
 }
 
